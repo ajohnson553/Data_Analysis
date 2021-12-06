@@ -1,0 +1,151 @@
+---
+title: "Anova_Practice"
+author: "Adam Johnson"
+date: "12/6/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+#knitr::opts_chunk$set(echo = TRUE)
+```
+
+## ANOVA Practice on Diet Dataset
+
+This code will be based off of the Diet Data set provided by the University of Sheffield.  In this program, I will be confirming that the weigh6variable is normally distributed. Once this is confirmed, I will perform an Anova Analysis between Diet Type and the variable, weight6weeks.  
+
+```{r}
+# Code to download the Diet Data set from The University of Sheffield Website. 
+fileName <- paste0("https://www.sheffield.ac.uk/polopoly_fs/1.937195!/file/Diet_R.csv")
+DietData <- read.csv(url(fileName))
+
+```
+## Snapshot of the Diet Data
+
+To start, I want to first quickly get a sense of the data that I will be working with. To do this, I will be using the summarize function to create a data frame of some basic statistics.  
+
+```{r}
+# Load dplyr package for data manipulation
+library(dplyr)
+
+# Groups the data by Diet type, and then creates a data frame of summary statistics for each Diet Type.  
+group_by(DietData, Diet) %>%
+  summarise(
+    count = n(),
+    mean = mean(weight6weeks, na.rm = TRUE),
+    sd = sd(weight6weeks, na.rm = TRUE), 
+    min = min(weight6weeks, na.rm = TRUE),
+    max = max(weight6weeks, na.rm = TRUE)
+  )
+
+```
+This gives a quick overview of the data that we will be analyzing.  
+
+
+## ANOVA Normallcy Assumption 
+
+In order for us to perform an Anova Analysis on the different Diets, we must first confirm that the data is normally distributed.  Since the Diet Data set is so small, it is important to confirm that the data is normally distributed.  In larger data sets, this step would not be as necessary due to the law of large numbers. To start, I will make a visualization to confirm normallcy.    
+
+```{r}
+#Loads ggpubr package for density plot.  
+library("ggpubr")
+
+# Creates a density graph along with an overlayed line that shows a normal data distribution.  
+ggdensity(DietData, x = "weight6weeks")+
+  stat_overlay_normal_density(color = "red", linetype = "dashed")
+```
+
+From this first visualization, we can visually confirm that the weight6weeks variable does seem to be normally distributed.  To further confirm this, I will create a qqplot of the weight6weeks variable. A qqplot show the correlation between your data and a normal distribution.  
+
+```{r}
+# Load ggpubr package
+library(ggpubr)
+
+# Creates QQ-Plot of Weight6weeks variable
+ggqqplot(DietData$weight6weeks)
+```
+
+
+As the majority of the points fall along the reference line, we can once again assume the  normality of the weight6weeks variable.  
+
+## ANOVA Test Visualiztion
+
+Now that we can confidently say that the data appears to be normally distributed, it is time to perform the Anova Analysis on Diet Type and weight6week variable.  To begin, I will create a few visualizations of the data.  
+
+## Box Plots of Diet and Weight6weeks
+
+```{r}
+# Creates Box Plot showing the three Diet Types. 
+
+ggboxplot(DietData, x = "Diet", y = "weight6weeks", 
+          color = "Diet", palette = c("blue", "orange", "red"),
+          order = c("1", "2", "3"),
+          ylab = "Weight", xlab = "Diet")
+```
+
+
+From the box plot, it appears that the means weights of all of the Diet types are very similar.
+
+## Anova Test
+
+Now that all of the initial analysis is done, it is time to actually perform the ANOVA test.  
+
+```{r}
+# Performs Anova Test
+AovResult <- aov(weight6weeks ~ as.factor(Diet), data = DietData)
+summary(AovResult)
+```
+For Anova Analysis, the Null-Hypothesis is that there is no significant difference between the mean of the groups that are being analyzed.  The Alternate Hypothesis is that at least one of the means is significantly different than the others.  The results of this Anova provide a p-value of 0.833.  This is a very high p-value, which means we accept the Null Hypothesis and assume that the means of all of the groups are the same.  
+
+## Tukey HSD test
+
+To further prove that we must accept the Null Hypothesis, we can run the Tukey HSD test. This test further breaks down the results and compares the means of each group to each other.  This result can also be plotted to further emphasize the results.  
+
+
+```{r}
+#Performs Tukey HSD test on Anova Results
+Tukey <- TukeyHSD(AovResult)
+
+#Prints Tukey results
+Tukey
+
+```
+
+From the adjusted p-values of each of the pairwise comparisons, it is clear that none of the means are significantly different from each other.  If one of the p-values was significant, it would indicate that there is a significant difference between the means of the tested groups. This confirms the results of the ANOVA analysis. 
+
+```{r}
+# Plots Tukey results
+plot(Tukey)
+```
+
+The graph of the Tukey results further shows that there is no significant differences between the means of the Diet groups.  If one of the horizontal lines was not going through the middle vertically line, that would indicate a statistical difference, however, that is not the case here.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
