@@ -114,7 +114,7 @@ ggboxplot(TempMonth, x = "Month", y = "Temp",
 
 ```
 
-The box plot further confirms the results of the t-test as it is clear that the two groups have different means.  
+The box plot further confirms the results of the t-test as it is very clear that the two groups have different means.
 
 
 
