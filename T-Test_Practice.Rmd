@@ -1,0 +1,150 @@
+---
+title: "T-Test Review"
+author: "Adam Johnson"
+date: "12/6/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+## T-Test Review
+
+This code will explore T-tests in R.  T-Tests measure how significant the difference between two groups are, or in other words, if the means of two groups are different. T-Tests assume normal distributions and equal variances.  The Null-Hypothesis of this test is that the means are the same.  The Alternative is that the means are significantly different. 
+
+To begin, I will perform a T-test on the 5th and 6th Month of the Airquality Data set. I am going to be performing this test on the Temp variable, to see if there was any significant change in Temp between the two months.   
+
+First, since I want to focus on the Temp variable of Months 5 and 6, I have to filter this data out from the Airquality data set. I did this via the dplyr package and the filter function. This leaves me with two data frames, one that only contains data on Month 5, and one that contains data on Month 6.   
+
+```{r}
+# Load the Dplyr Library for Data Manipulation
+library(dplyr)
+
+# Filters the data set into two separate data frames.  One for Month 5 and one for Month 6
+Month5 <- airquality %>% filter(airquality$Month == "5")
+Month6 <- airquality %>% filter(airquality$Month == "6")
+
+# Combines both Month5 and Month6 into one single data frame
+TempMonth <- rbind(Month5, Month6)
+
+```
+
+```{r}
+# Code to get a glimpse of the Data 
+head(airquality)
+
+# code to provide a summary of the Temp Variable 
+group_by(TempMonth, Month) %>%
+  summarise(
+    count = n(),
+    mean = mean(Temp, na.rm = TRUE),
+    sd = sd(Temp, na.rm = TRUE)
+  )
+
+```
+
+## Check for Normallcy
+
+One of the assumptions of a T-test is that the data is normally distributed.  To quickly check wether the Temp variable is normal, I performed a Shapiro-Wilk test.  If this test provides a significant p-value, we can reject the null hypothesis and say that the the distribution is significantly different from normal.
+
+```{r}
+# Shapiro Test on Month5 Data Frame for Temp
+shapiro.test(Month5$Temp)
+
+# Shapiro Test on Month6 Data Frame for Temp
+shapiro.test(Month6$Temp)
+
+```
+Both of the outputs resulted in non-signicant p-values, which allows us to assume that both of the variables are normally distributed.  
+
+## Visual Check For Normallcy 
+
+As further confirmation of the data being normally distributed, I have created some density plots.  These plots have a normal distribtion overlayed ontop of the actual data.  
+
+
+```{r}
+# Load ggpubr package
+library(ggpubr)
+
+# Creates two Density plots.  One for Month 5 Temp, and one for Month 6 Temp
+par(mfrow = c(1,2))
+ggdensity(Month5$Temp, title = "Month 5 Temp", xlab = "Temp") +
+  stat_overlay_normal_density(color = "red", linetype = "dashed")
+
+ggdensity(Month6$Temp, title = "Month 6 Temp", xlab = "Temp") +
+  stat_overlay_normal_density(color = "red", linetype = "dashed")
+
+```
+
+From the two density plots, we can see that both the Month 5 and the Month 6 Temp are appearing to follow a normal distribution.  
+
+## Equal Variance of the Data
+
+Another assumption of the t-test is that the variance of the data is equal. One way to check if this is the case is through the var.test() function.   
+
+```{r}
+# Performs Var.Test to check for equal variances
+ftest <- var.test(Temp ~ Month, data = TempMonth)
+ftest
+```
+The F-Test gives a p-value of 0.8391, which is not significant. This means that we cannot reject the Null Hypothesis, therefore allowing us to assume that the variances between the groups are equal.  
+
+## T-Test
+
+Now that Normality and equal variance of the data has been confirmed, we can conduct the t-test.  
+
+```{r}
+# Performs T-Test
+TestResult <- t.test(Temp ~ Month, data = TempMonth, var.equal = TRUE)
+TestResult
+
+```
+The output of the T-test gives a highly significant p-value.  The means that we can reject the null hypothesis and accept the alternative.  The Alternative Hypothesis says that there is a significant differences between the means of Temp in Months 5 and 6.  
+
+## Box Plot Visualization 
+
+```{r}
+# Plots Box plot of Temp by Month
+library("ggpubr")
+ggboxplot(TempMonth, x = "Month", y = "Temp", 
+          color = "Month", palette = c("blue", "red"),
+          ylab = "Temp", xlab = "Month")
+
+```
+
+The box plot further confirms the results of the t-test as it is clear that the two groups have different means.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
