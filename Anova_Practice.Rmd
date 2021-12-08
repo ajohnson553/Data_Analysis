@@ -84,7 +84,7 @@ ggboxplot(DietData, x = "Diet", y = "weight6weeks",
 ```
 
 
-From the box plot, it appears that the means weights of all of the Diet types are very similar.
+From the box plot, it appears possible that the means weights of all of the Diet types are very similar.
 
 ## Anova Test
 
