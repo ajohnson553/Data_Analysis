@@ -103,18 +103,19 @@ TestResult
 ```
 The output of the T-test gives a highly significant p-value.  The means that we can reject the null hypothesis and accept the alternative.  The Alternative Hypothesis says that there is a significant differences between the means of Temp in Months 5 and 6.  
 
-## Box Plot Visualization 
+## Mean Plot Visualization 
 
 ```{r}
-# Plots Box plot of Temp by Month
+# Plots Mean plot of Temp by Month
 library("ggpubr")
-ggboxplot(TempMonth, x = "Month", y = "Temp", 
-          color = "Month", palette = c("blue", "red"),
-          ylab = "Temp", xlab = "Month")
 
+ggline(TempMonth, x = "Month", y = "Temp", 
+       add = c("mean_se", "jitter"), 
+       order = c("Month", "5", "6"),
+       ylab = "Temp", xlab = "Month")
 ```
 
-The box plot further confirms the results of the t-test as it is very clear that the two groups have different means.
+The Mean plot further confirms the results of the t-test as it is very clear that the two groups have different means.
 
 
 
