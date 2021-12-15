@@ -1,0 +1,205 @@
+---
+title: "Regression Practice"
+author: "Adam Johnson"
+date: "12/13/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+## Mutiple Linear Regression Practice
+
+This Markdown file will show the building of a multiple linear regression model of the real estate data set located here: https://www.kaggle.com/quantbruce/real-estate-price-prediction/code
+
+The goal of the model will be to predict the house_price_of_unit_area.  
+
+```{r}
+# Load the dataset into realestate data frame
+realestate <- read.csv("Realestate.csv")
+
+```
+## Initial Analysis
+
+The first step of my analysis is to become comfortable with and knowledgeable of the data.  The below code displays the beginning rows of the data frame.  The second line displays summary statistics of all of the columns of the data frame.  
+
+```{r}
+# View structure of the Data
+head(realestate)
+#View Summary of Data
+summary(realestate)
+```
+
+## Checking for Linearity 
+
+In order to perform a regression analysis, the relationship between the dependent variable and the independent variables must be linear.  In order to check this, I created multiple scatter plots between all of the different variables.  
+
+```{r}
+# Creates scatter plot of all of the variables to check for linearity.  
+# Appears that the relationship is linear with house age, distance to station, and number of stores
+par(mfrow = c(2,2))
+scatter.smooth(x = realestate$house_age, y = realestate$house_price_of_unit_area)
+scatter.smooth(x = realestate$distance_to_station, y = realestate$house_price_of_unit_area)
+scatter.smooth(x = realestate$number_of_stores, y = realestate$house_price_of_unit_area)
+scatter.smooth(x = realestate$longitude, y = realestate$house_price_of_unit_area)
+scatter.smooth(x = realestate$latitude, y = realestate$house_price_of_unit_area)
+```
+
+From the scatter plots, it appears that the relationships are close to linear in nature.  
+
+## Checking for Outliers 
+
+Next, I want to check all of the variables for any outliers which may skew the data. To do this, I created box plots of all of the variables.  
+
+```{r}
+# Box Plots to check for Outliers
+# Distance to Station has a lot of Outliers that may need to be addressed
+par(mfrow = c(2,2))
+boxplot(realestate$house_age, main="Age", sub=paste("Outlier rows: ", boxplot.stats(realestate$house_age)$out)) 
+boxplot(realestate$distance_to_station, main="Distance to Station", sub=paste("Outlier rows: ", boxplot.stats(realestate$distance_to_station)$out)) 
+boxplot(realestate$number_of_stores, main="Number of Stores", sub=paste("Outlier rows: ", boxplot.stats(realestate$number_of_stores)$out)) 
+boxplot(realestate$longitude, main="longitude", sub=paste("Outlier rows: ", boxplot.stats(realestate$longitude)$out)) 
+boxplot(realestate$latitude, main="latitude", sub=paste("Outlier rows: ", boxplot.stats(realestate$latitude)$out)) 
+```
+
+From the box plots it is clear that the variable with the majority of outliers is distance_to_station. It is good to note this, as the larger number of outliers may cause issues in the model.  
+
+
+## Correlation of Variables
+
+Next, I wanted to check which variables were strongly correlated with each other. I did this to assist with choosing the predictor variables for the linear model I will be constructing. 
+```{r}
+# Checking for Correlations of Variables
+cor(realestate)
+```
+When looking at the resulting correlation table. It appears that most of the independent variables have a relatively strong correlation with the dependent variable, house_price_of_unit_area. 
+transaction_date has the weakest correlation with the dependent variable, so I will exclude that variable in the model to start. This table could also be used to check the multicollinearity assumption, but I use a different method of checking that later in the code.    
+
+## Building the Model
+
+Now that the assumptions have been met, it is time to construct our first model. This first attempt includes all of the predictor variables to start.
+
+Before actually constructing the model, I am going to divide the data into Training and Testing subsets for purposes of testing the model.  
+
+```{r}
+# Divides data into two sets.  Training Data = 80% and Testing = 20% 
+set.seed(100)  # setting seed to reproduce results of random sampling
+trainingRow <- sample(1:nrow(realestate), 0.8*nrow(realestate))  # row indices for training data
+trainingData <- realestate[trainingRow, ]  # model training data
+testData  <- realestate[-trainingRow, ]   
+
+```
+
+Now that the data has been partitioned, it is time to begin building the model on the training data.
+
+```{r}
+# Creates the first model.  All variables included
+model1 <- lm(house_price_of_unit_area ~ house_age + distance_to_station + number_of_stores + latitude +
+               longitude + transaction_date, data = trainingData)
+summary(model1)
+```
+From the summary of the model, it is clear that longitude variable is not significant. Because of this, I will remove longitude in the next rendition of the model.  The rest of the metrics of the model look strong.  The model has a highly significant p-value. This tells us that we can reject the Null-hypothesis that there is no relationship between the Dependent Variable and the predictors (as in all of the coefficients are 0) The adj R^2 shows us that the model is accounting for 57% of the variance of the data. 
+
+```{r}
+# Removed Longitude variable from the model 
+model2 <- lm(house_price_of_unit_area ~ house_age + distance_to_station + number_of_stores + latitude 
+             + transaction_date, data = trainingData)
+summary(model2)
+```
+
+The second model shows that all of the coefficients are significant, which is an improvement over the first edition of the model.  The Adj-R^2 is also slightly higher, and standard error is lower.  The F-statistic is also higher than the previous model, which shows that the model is fitting the data better than it was before.
+
+## Model Validation 
+
+Now that we have selected a model, we must check to see that the model meets all the assumptions required of a linear regression.  These assumptions are linearity (Check above), Normality of the residuals, no Multicollinearity and no heteroskedasticity. To check these assumptions, I will be using the "lindia" package to graph all of the relevant charts at once.
+
+```{r}
+library(lindia)
+lindia::gg_diagnose(model2)
+```
+
+Based off of the histogram of residuals and the Normal-QQ Plot, it appears that our residuals are normally distributed. In terms of heteroskedasticity, it is clear from the Residual vs. Fitted Value chart that there are some slight signs of heteroskedasticity. The residuals appear to be relatively flat, but there is some clumping in the higher fitted values, which is concerning.  
+
+To check for multicollinearity, I will use the VIF function from the caret package.
+
+```{r}
+# Check for multicollinearity
+library("caret")
+car::vif(model2)
+```
+
+This function makes it very easy to see that there is no Multicollinearity in this model, as all of the values returned from the VIF function are relatively low.  
+
+Since there is no Multicollinearity, we can now test to see if there is any sign of autocorrelations.  Autocorrelations are when the resiudals are not independent from one another. To test this we can use the acf function. 
+
+```{r}
+# Plot checking for autocorreltaion of the residuals
+acf(model2$residuals)
+```
+From the plot it is clear that there is no sign of autocorrelations in our data.  
+
+## Making Predictions 
+
+After reviewing all that the assumptions of linear regression are met, we can proceed to make predictions with our selected model.  These predictions will be run on the Test partition of the Data.   
+
+```{r}
+# Saves model predictions in variable predictions. 
+predictions <- predict(model2, testData)
+
+# Creates data frame of actual values and predictions
+actuals_preds <- data.frame(cbind(actuals=testData$house_price_of_unit_area, predicteds=predictions))
+head(actuals_preds)
+
+# Check the correlation of the actual and predicteds as indication of how model performed. 
+cor_accuracy <- cor(actuals_preds)
+cor_accuracy  # .72 Correlation
+
+```
+
+Based off of the correlation between the actual values and the predicted values (.819), we can say that our model performed well. If the correlation was 1, the predictions would have been perfect.
+
+To further check the model's accuracy, I calculated the Min Max accuracy of the models. 
+
+```{r}
+# Take Min Max accuracy to help judge model performance 
+min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))  
+min_max_accuracy ## Min_Max Accuracy of 84% -- Not Bad! 
+```
+The Min Max Accuracy gives a value of 84%, which tells that the model is performing well. A perfect model would have a min max accuracy of 1.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
