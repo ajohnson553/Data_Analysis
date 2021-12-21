@@ -1,0 +1,209 @@
+---
+title: "Fifa_Overall"
+author: "Adam Johnson"
+date: "12/20/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+## Linear Regression to Predict FIFA Player Overalls
+
+In this code I will be building a linear model to attempt to player rankings from the video game Fifa.  The data set used is provided here: https://www.kaggle.com/karangadiya/fifa19
+
+```{r}
+# Loading the Data and Removing any NAs
+fifa <- read.csv("fifa_data.csv")
+fifa <- na.omit(fifa)
+```
+
+## Overview of the data
+
+```{r}
+# Summary Stats of all of the Columns
+head(fifa)
+summary(fifa)
+
+```
+
+As I will be attempting to predict Overall, I created the below histogram to get a better sense of how the data is distributed. 
+
+```{r}
+# Creates histogram of the Dependent Variable 
+hist(fifa$Overall)
+```
+
+It appears that the variable that I will be trying to predict is normally distributed. 
+
+
+Next, I went in and selected only the Numeric Columns that I will be using as predictors.  I also removed ID columns and columns related to Goal Keeping stats, as they are irrelevant to the majority of players. 
+```{r}
+# Selecting Just the Numeric Columns
+num_column <- unlist(lapply(fifa, is.numeric))
+num_fifa <- fifa[ ,num_column]
+
+# Also removing Identification Columns along with columns related to GK
+num_fifa <- subset(num_fifa, select = -c(ID, ï.., GKPositioning,GKDiving,GKReflexes, GKHandling, GKKicking))
+
+head(num_fifa)
+```
+
+## Visualizations
+
+I used the code below to make scatter plots of all of the variables put against Overall ranking. This can help to visualize which of the relationships are linear.  
+```{r}
+# Generates scatter plots of all of the variables against Overall
+library("dplyr")
+library("ggplot2")
+library("tidyverse")
+num_fifa %>%
+  gather(-Overall, key = "var", value = "value") %>%
+  ggplot(aes(x = value, y = Overall)) +
+  geom_point() +
+  stat_smooth() +
+  facet_wrap(~ var, scales = "free") +
+  theme_bw()
+```
+
+Next, I wanted to check for correlations between the variables.  This can help to get an idea of which predictors to use in the model. 
+```{r}
+# Code to visually check for correlations
+library(corrplot)
+correlations <- cor(num_fifa)
+corrplot(correlations, method="circle")
+```
+As there appear to be many correlations between the different variables, I will start the modeling with all of the variables included, and adjust from there.  
+
+## Partitioning Data 
+
+Before training the model, I will create two data sets.  One for training and one for testing the resulting model.  
+
+```{r}
+# Creates training and test data
+set.seed(100)  # setting seed to reproduce results of random sampling
+trainingRow <- sample(1:nrow(num_fifa), 0.8*nrow(num_fifa))  
+trainingData <- num_fifa[trainingRow, ]  
+testData  <- num_fifa[-trainingRow, ]  
+```
+
+## Modeling 
+
+For the first attempt at the model, I went in and used all of the available predictors. This is the base line from which the model can be adjusted in future iterations. 
+```{r}
+# Creates the first model. 
+fifa_model <- lm(Overall ~ ., data = trainingData)
+# Creates summary of the model to review the metrics. 
+summary(fifa_model)
+# Creates plots of the model to be used for validation purposes. 
+par(mfrow = c(2,2))
+plot(fifa_model)
+```
+
+
+As many of the variables were not significant, for the next model, I went ahead and removed all of them,  
+
+```{r}
+# Removing Non-significant Coefficients to compare to previous model.  
+trainingData <- subset(trainingData, select = -c(Weak.Foot, Curve, FKAccuracy, Agility, LongShots, Interceptions, Vision, Marking, StandingTackle))
+                                        
+```
+
+Now that all of the non-significant coefficients have been removed, I once again ran the linear model.
+
+```{r}
+# Second rendition of the model, this time will all of the non-significant coefficients removed.
+fifa_model2 <- lm(Overall ~ ., data = trainingData)
+summary(fifa_model2)
+par(mfrow = c(2,2))
+plot(fifa_model2)
+```
+
+New model has improved F-Statistics, while all other attributes are the same. All coefficients are now significant. 
+
+To see if the model can be improved any more, I also removed the two coefficients with the lowest levels of significance.  As we can see from the previous model summary, these two coefficients are Finishing and Volleys. 
+
+```{r}
+# Removing lowest significance to see if any improvement
+trainingData <- subset(trainingData, select = -c(Finishing, Volleys))
+```
+
+Now that all of the selected variables have been removed, it is time to once again run the model.  
+
+```{r}
+# Third rendition of the model. 
+fifa_model3 <- lm(Overall ~ ., data = trainingData)
+summary(fifa_model3)
+par(mfrow = c(2,2))
+plot(fifa_model3)
+```
+Third model results in all highly significant coefficients.  Highest F-Statistic so far, however the R^2 value dropped by a minuscule 0.01.  I will be using this third model for making my predictions as it has the highest F-statistic, which indicates that it has the best fit of the three models. 
+
+
+## Predictions
+
+Now that the model has been chosen, it is time to actually make predictions with the model.  
+
+```{r}
+# Creates the predictions and saves in predictions variable
+predictions <- round(predict(fifa_model3, trainingData),0)
+
+# Creates data frame of predictions and actual values
+actuals_preds <- data.frame(cbind(actuals=trainingData$Overall, predicteds=predictions))
+head(actuals_preds)
+
+# Takes correlation between the actual values and the predicted values
+cor_accuracy <- cor(actuals_preds)
+cor_accuracy
+
+# Calculates min max accuracy of the predictions. The closer to 1, the better the model is performing. 
+min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))  
+min_max_accuracy 
+
+```
+
+When running the model on the training data, it is clear that the model is performing very well.  The correlation between the actual values and the predictions is approximately 95%.  This indicates that the predictions are very close to the actual values.  The calculated min max value is .9757, which also indicates that the model is performing very strongly.
+
+Finally, to confirm that this model is working well, I did the same predictions on the test data.  This is to check to see if there is any over fitting, and if the model can still perform well on a data set that it was not trained on.  
+
+```{r}
+# Running Model on Testing data to see if there is any over fitting
+
+predictions <- round(predict(fifa_model3, testData),0)
+
+actuals_preds <- data.frame(cbind(actuals=testData$Overall, predicteds=predictions))
+head(actuals_preds)
+cor_accuracy <- cor(actuals_preds)
+cor_accuracy
+
+min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max))  
+min_max_accuracy  
+
+
+```
+
+The predictions on the test data resulted in nearly identical correlations and min max values.  Because of this, we can say that there does not appear to be a risk of over fitting.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
