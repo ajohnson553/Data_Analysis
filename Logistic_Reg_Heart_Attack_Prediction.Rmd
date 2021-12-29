@@ -1,0 +1,201 @@
+---
+title: "Risk of Heart Attack Prediction"
+author: "Adam Johnson"
+date: "12/26/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+
+```
+
+## Risk of Heart Attack Logisitc Regression       
+
+This code will be an analysis of the Heart Attack Analysis and Prediction dataset found here: https://www.kaggle.com/rashikrahmanpritom/heart-attack-analysis-prediction-dataset.
+
+My goal with this analysis will be to create a logistic regression model to determine if a person is at higher risk of a heart attack.  The Dependent variable will be Output, where 1 = Higher chance of heart attack, and 0 = lower chance of heart attack.  
+
+## Initial Analysis
+
+To begin, we have to load the data.  To be sure that the dataset is useable for analysis, I also went ahead and removed any potential NA values.  
+```{r}
+# Loading the data
+heart <- read.csv("heart.csv")
+# Removing any NA values
+heart <- na.omit(heart)
+```
+
+Next, I wanted to get a sense of the data set. To do this, I displayed the first six rows of the data, and also printed some summary statistics of all of the variables.  
+
+```{r}
+#Summary of the data
+head(heart)
+
+# Prints summary statisitcs of the varaibles
+summary(heart)
+```
+I also wanted to visually see the relationships between the Dependent variable (Output) and all of the potential predictors.  I used the code below to create scatter plots of all of the these releationships.  
+
+```{r}
+# Graphs of all of the Variables
+library("dplyr")
+library("ggplot2")
+library("tidyverse")
+heart %>%
+  gather(-output, key = "var", value = "value") %>%
+  ggplot(aes(x = value, y = output)) +
+  geom_point() +
+  stat_smooth() +
+  facet_wrap(~ var, scales = "free") +
+  theme_bw()
+```
+
+## Step-wise Logistic Regression Model 
+
+Now that I have a sense of the data, it is time to begin the Logistic Regression modeling. First of all, the data needs to be partitioned into training and testing data sets. The code below divides the data into a training set (which contains 80% of the original data) and a testing set (containing the remaining 20% of the data).
+
+```{r}
+# Partition the data
+set.seed(123) 
+trainingRow <- sample(1:nrow(heart), 0.8*nrow(heart))  
+heartTrain <- heart[trainingRow, ]  
+heartTest  <- heart[-trainingRow, ]  
+
+```
+
+Now that the data has been partitioned, it is time to build the model. In this case, I will be using step-wise regression to build the model.  This technique will go through all of the available variables and select the model that results in the lowest AIC value.  
+
+
+```{r}
+# Step-wise regression model
+library(MASS)
+# Fit the model via step-wise regression
+model <- glm(output ~., data = heartTrain, family = binomial) %>%
+  stepAIC(trace = FALSE)
+# Summarize the final selected model
+summary(model)
+```
+
+The resulting model looks strong. All of the coefficients are showing as significant, which means that the coefficient is not zero and that there is a relationship between the dependent and predictor variable.  There is also a large difference between the Null deviance (Residuals with only Intercept) and Residual deviance (Residuals with all variables), which further supports that the model is performing well.   
+
+## Making Predictions 
+
+Now that the best model has been chosen, it is time to make predictions.  
+
+```{r}
+# Predictions
+trainOutcome <- predict(model, heartTrain, type = 'response')
+
+# If prediction is >= 0.5, classify as 1. 
+trainOutcome <- ifelse(trainOutcome >= 0.5, 1, 0)
+# Add predictions to the training data set 
+heartTrain$Prediction <- trainOutcome
+head(heartTrain)
+```
+
+Now that the predictions have been made, it is time to check the accuracy of the model. To do this, I first build a contingency table to see the frequency of each prediction. From this, it is simple to calculate the accuracy of the model.  
+
+```{r}
+# Contingency Table 
+contingencyTable <- as.data.frame(with(heartTrain, table(Prediction, output)))
+
+# Accuracy
+accuracy <- sum(contingencyTable[contingencyTable$Prediction == contingencyTable$output,]$Freq) /
+  sum(contingencyTable$Freq)
+contingencyTable
+accuracy
+```
+
+The model had a correct classification rate of 85.5%, which tells us that the model is performing very well.  To check for overfitting, the model must now be run on the testing data set as well. The code below shows the predictions and accuracy for the test data.  
+
+```{r}
+# Predictions
+trainOutcome <- predict(model, heartTest, type = 'response')
+
+# If prediction is >= 0.5, classify as 1. 
+trainOutcome <- ifelse(trainOutcome >= 0.5, 1, 0)
+
+# Add predictions to the Test data set 
+heartTest$Prediction <- trainOutcome
+head(heartTest)
+
+# Contingency Table 
+contingencyTable <- as.data.frame(with(heartTest, table(Prediction, output)))
+
+# Accuracy
+accuracy <- sum(contingencyTable[contingencyTable$Prediction == contingencyTable$output,]$Freq) /
+  sum(contingencyTable$Freq)
+contingencyTable
+accuracy
+
+```
+
+As the testing data set had a very similar accuracy to training data, 83.6%, it does not appear that there is any risk of the data overfitting.  
+
+
+## Full Model Test Comparision
+
+For Comparison's sake, I also ran the logistic regression with all of the variables included.  As we see from the result, the majority of the coefficients are insignificant and this model results in a higher AIC value. 
+
+```{r}
+# Model with all of the variables 
+fullmodel <- glm(output ~., data = heartTrain, family = binomial)
+summary(fullmodel)
+```
+
+When predictions are made with the full model it results in the same accuracy as the step-wise model.  
+
+```{r}
+# Predictions
+Outcome <- predict(fullmodel, heartTrain, type = 'response')
+Outcome <- ifelse(Outcome >= 0.5, 1, 0)
+heartTrain$Pred <- Outcome
+
+# Contingency Table 
+contingencyTable <- as.data.frame(with(heartTrain, table(Pred, output)))
+
+# Accuracy
+accuracy <- sum(contingencyTable[contingencyTable$Pred == contingencyTable$output,]$Freq) /
+  sum(contingencyTable$Freq)
+contingencyTable
+accuracy
+```
+
+The Step-wise model gives the exact same accuracy while using less variables. A less complex model with the same or similar accuracy is preferable to a model that is far more complex.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
